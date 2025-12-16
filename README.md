@@ -1,29 +1,45 @@
-# Pipeline offline PDF → (empresa, funcionario)
+# Pipeline Offline PDF → (empresa, funcionário)
 
-Pipeline em **Python 3.11** totalmente **offline** para extrair **empresa** e **funcionário** de PDFs usando:
+Pipeline em **Python 3.11** totalmente **offline** para extrair informações de **empresa** e **funcionário** de documentos PDF usando processamento local e modelos de linguagem.
 
-- Docling (PDF → JSON/estrutura)
-- spaCy (NER + heurísticas)
-- llama.cpp via `llama-cpp-python` (decisão final restrita a candidatos)
+## 📋 Visão Geral
 
-## Requisitos
+Este projeto implementa um pipeline de extração de informações estruturadas a partir de PDFs, combinando:
 
-- Windows 10/11
-- Python 3.11.x (recomendado)
-- Execução local (processamento do PDF ocorre na sua máquina)
-- Modelo GGUF local em `models/`
-- Modelo spaCy `pt_core_news_lg` já disponível **offline** (não baixar em runtime)
+- **Docling**: Conversão de PDF para estrutura JSON
+- **spaCy**: Reconhecimento de entidades nomeadas (NER) e heurísticas
+- **llama.cpp**: Decisão final usando modelos de linguagem locais (GGUF)
 
-## Instalação (offline)
+O pipeline foi projetado para funcionar **completamente offline**, garantindo privacidade e segurança dos dados processados.
 
-1. Crie um venv:
+## 🏗️ Arquitetura
+
+O pipeline segue uma arquitetura modular em etapas:
+
+1. **Extração (extract_json)**: Converte PDF para JSON estruturado usando Docling
+2. **Blocos (blocks)**: Processa e normaliza os blocos de texto extraídos
+3. **Candidatos (candidates)**: Gera candidatos para empresa e funcionário usando spaCy NER
+4. **Pontuação (scoring)**: Classifica e ranqueia os candidatos com base em heurísticas
+5. **Decisão LLM (decision_llm)**: Usa modelo de linguagem local para decisão final
+6. **Confiança (confidence)**: Calcula métricas de confiança para os resultados
+
+## 🚀 Requisitos
+
+- **Sistema Operacional**: Windows 10/11
+- **Python**: 3.11.x (recomendado)
+- **Modelo GGUF**: Modelo de linguagem local em formato GGUF (ex.: `models/model.gguf`)
+- **Modelo spaCy**: `pt_core_news_lg` instalado offline
+
+## 📦 Instalação
+
+### 1. Criar ambiente virtual
 
 ```bash
 py -3.11 -m venv .venv
 .\.venv\Scripts\activate
 ```
 
-2. Instale dependências a partir de wheels/artefatos locais.
+### 2. Instalar dependências
 
 Este projeto **não faz download automático**. Você deve ter um diretório local com wheels, por exemplo `wheels/`.
 
@@ -31,7 +47,7 @@ Este projeto **não faz download automático**. Você deve ter um diretório loc
 pip install --no-index --find-links wheels -r requirements.txt
 ```
 
-3. Instale o modelo spaCy **offline** (sem downloads em runtime).
+### 3. Instalar modelo spaCy offline
 
 Se você tem o pacote do modelo (ex.: `pt_core_news_lg-*.whl`) em `wheels/`, use:
 
@@ -39,39 +55,152 @@ Se você tem o pacote do modelo (ex.: `pt_core_news_lg-*.whl`) em `wheels/`, use
 pip install --no-index --find-links wheels pt_core_news_lg
 ```
 
-4. Coloque seu modelo GGUF em `models/` (ex.: `models/model.gguf`).
+### 4. Configurar modelo GGUF
 
-## Uso
+Coloque seu modelo GGUF em `models/` (ex.: `models/model.gguf`).
+
+## 💻 Uso
+
+### Uso básico
 
 ```bash
 python main.py --pdf examples\sample.pdf --out output\result.json --model models\model.gguf
 ```
 
-### Privacidade e rede
+### Opções disponíveis
 
-- **O pipeline não “sobe” seu PDF nem o resultado.** O processamento acontece localmente.
-- Algumas bibliotecas (ex.: Docling) podem **baixar modelos** na primeira execução. Isso é **download de artefatos**, não upload do seu documento.
-- Se você quiser bloquear qualquer acesso à rede (e aceitar `INDEFINIDO` quando faltar modelo), use:
+- `--pdf`: Caminho para o PDF de entrada (obrigatório)
+- `--out`: Caminho para o arquivo JSON de saída (obrigatório)
+- `--model`: Caminho para o modelo GGUF (opcional)
+- `--chat-format`: Formato de chat do llama.cpp (ex.: `qwen`) - útil quando o modelo precisa de um template explícito
+- `--offline`: Desabilita acesso à rede (sem downloads de modelos). Se os modelos necessários estiverem faltando, a saída será `INDEFINIDO`
+- `--debug`: Inclui detalhes de debug no JSON de saída
+
+### Exemplo com modo offline
 
 ```bash
 python main.py --pdf funcionario.pdf --out output\result.json --offline
 ```
 
-Para evitar subir arquivos no Git, este projeto ignora por padrão `*.pdf`, `output/` e `models/` via `.gitignore`.
+## 📤 Formato de Saída
 
-Saída:
+O pipeline gera um arquivo JSON com a seguinte estrutura:
+
+```json
+{
+  "funcionario": "João Silva",
+  "empresa": "Empresa XYZ Ltda",
+  "confidence": {
+    "funcionario": 0.85,
+    "empresa": 0.92
+  },
+  "debug": {
+    "extraction_quality": "ok",
+    "blocks_count": 45,
+    "candidates_count": {
+      "funcionarios": 12,
+      "empresas": 8
+    },
+    "top_ranked": {
+      "funcionario": [
+        {"text": "João Silva", "score": 0.95},
+        {"text": "J. Silva", "score": 0.70}
+      ],
+      "empresa": [
+        {"text": "Empresa XYZ Ltda", "score": 0.98}
+      ]
+    },
+    "llm_used": true
+  }
+}
+```
+
+### Casos de erro
+
+Em caso de falha na extração ou erro de processamento, a saída será:
 
 ```json
 {
   "funcionario": "INDEFINIDO",
   "empresa": "INDEFINIDO",
-  "confidence": { "funcionario": 0.0, "empresa": 0.0 },
-  "debug": { "extraction_quality": "weak" }
+  "confidence": {
+    "funcionario": 0.0,
+    "empresa": 0.0
+  },
+  "debug": {
+    "extraction_quality": "weak",
+    "error": "extract_failed:ExceptionName"
+  }
 }
 ```
 
-## Notas de determinismo
+## 🔒 Privacidade e Segurança
 
-- LLM roda com `temperature=0` e `seed` fixo.
-- Ranking e desempates são estáveis (ordem de aparição como fallback).
-- Em caso de extração ruim / erro de modelo / erro de validação JSON: retorna `INDEFINIDO`.
+- **Processamento 100% local**: O pipeline não envia seu PDF nem resultados para nenhum servidor
+- **Modo offline**: Use a flag `--offline` para garantir que nenhum download ocorra durante a execução
+- **Arquivos ignorados**: Por padrão, o `.gitignore` exclui `*.pdf`, `output/`, `result/` e `models/`
+
+## ⚙️ Configuração
+
+As configurações do pipeline podem ser ajustadas em `config.py` através da classe `PipelineConfig`:
+
+- **Extração**: Qualidade mínima de extração, número mínimo de caracteres úteis
+- **Candidatos**: Modelo spaCy, número máximo de candidatos por tipo
+- **Pontuação**: Pesos para diferentes heurísticas (palavras-chave, frequência, posição, formato)
+- **LLM**: Parâmetros do modelo (contexto, temperatura, tokens máximos)
+- **Confiança**: Limite mínimo de confiança
+
+## 🧪 Testes
+
+O projeto inclui testes para garantir qualidade e determinismo:
+
+```bash
+pytest tests/
+```
+
+### Testes disponíveis
+
+- `test_determinism.py`: Verifica que os resultados são determinísticos
+- `test_extract_quality.py`: Valida a qualidade da extração
+
+## 📝 Notas sobre Determinismo
+
+- O LLM roda com `temperature=0` e `seed` fixo para garantir resultados reproduzíveis
+- Ranking e desempates são estáveis (ordem de aparição como fallback)
+- Em caso de extração ruim, erro de modelo ou erro de validação JSON: retorna `INDEFINIDO`
+
+## 📁 Estrutura do Projeto
+
+```
+docling_project/
+├── main.py                 # Ponto de entrada principal
+├── config.py              # Configurações do pipeline
+├── requirements.txt       # Dependências do projeto
+├── pipeline/              # Módulos do pipeline
+│   ├── __init__.py
+│   ├── blocks.py          # Processamento de blocos de texto
+│   ├── candidates.py      # Geração de candidatos (NER)
+│   ├── confidence.py      # Cálculo de confiança
+│   ├── decision_llm.py    # Decisão final com LLM
+│   ├── extract_json.py    # Extração Docling
+│   ├── scoring.py         # Pontuação e ranking
+│   └── utils.py           # Utilitários
+└── tests/                 # Testes automatizados
+    ├── test_determinism.py
+    └── test_extract_quality.py
+```
+
+## 🤝 Contribuindo
+
+Este é um projeto privado. Para contribuições, entre em contato com o mantenedor.
+
+## 📄 Licença
+
+[Especificar licença se aplicável]
+
+## 🔗 Referências
+
+- [Docling](https://github.com/DS4SD/docling)
+- [spaCy](https://spacy.io/)
+- [llama.cpp](https://github.com/ggerganov/llama.cpp)
+- [llama-cpp-python](https://github.com/abetlen/llama-cpp-python)
