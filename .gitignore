@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Do not commit private documents or generated outputs
+*.pdf
+output/
+result/
+
+# History folder
+.history/
+
+# Large local models
+models/
+*.gguf
+
+# Optional local wheelhouse
+wheels/
+
+
