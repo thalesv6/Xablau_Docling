@@ -208,9 +208,6 @@ docling_project/
 
 Este é um projeto privado. Para contribuições, entre em contato com o mantenedor.
 
-## 📄 Licença
-
-[Especificar licença se aplicável]
 
 ## 🔗 Referências
 
