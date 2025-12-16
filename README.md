@@ -1,6 +1,6 @@
 # Pipeline Offline PDF → (empresa, funcionário)
 
-Pipeline em **Python 3.11** totalmente **offline** para extrair informações de **empresa** e **funcionário** de documentos PDF usando processamento local e modelos de linguagem.
+Pipeline em **Python 3.11** para extrair informações de **empresa** e **funcionário** de documentos PDF usando processamento local e modelos de linguagem.
 
 ## 📋 Visão Geral
 
@@ -10,7 +10,7 @@ Este projeto implementa um pipeline de extração de informações estruturadas 
 - **spaCy**: Reconhecimento de entidades nomeadas (NER) e heurísticas
 - **llama.cpp**: Decisão final usando modelos de linguagem locais (GGUF)
 
-O pipeline foi projetado para funcionar **completamente offline**, garantindo privacidade e segurança dos dados processados.
+O pipeline processa documentos **localmente** (sem enviar dados para servidores externos) e faz **downloads automáticos** de modelos e dependências quando necessário.
 
 ## 🏗️ Arquitetura
 
@@ -27,8 +27,8 @@ O pipeline segue uma arquitetura modular em etapas:
 
 - **Sistema Operacional**: Windows 10/11
 - **Python**: 3.11.x (recomendado)
-- **Modelo GGUF**: Modelo de linguagem local em formato GGUF (ex.: `models/model.gguf`)
-- **Modelo spaCy**: `pt_core_news_lg` instalado offline
+- **Conexão com internet**: Necessária para downloads automáticos de dependências e modelos
+- **Modelo GGUF**: Modelo de linguagem local em formato GGUF (ex.: `models/model.gguf`) - opcional
 
 ## 📦 Instalação
 
@@ -41,23 +41,38 @@ py -3.11 -m venv .venv
 
 ### 2. Instalar dependências
 
-Este projeto **não faz download automático**. Você deve ter um diretório local com wheels, por exemplo `wheels/`.
+O projeto faz **downloads automáticos** de todas as dependências necessárias:
 
 ```bash
-pip install --no-index --find-links wheels -r requirements.txt
+pip install -r requirements.txt
 ```
 
-### 3. Instalar modelo spaCy offline
+### 3. Instalar modelo spaCy
 
-Se você tem o pacote do modelo (ex.: `pt_core_news_lg-*.whl`) em `wheels/`, use:
+O modelo spaCy `pt_core_news_lg` será baixado automaticamente na primeira execução. Para instalar manualmente:
 
 ```bash
-pip install --no-index --find-links wheels pt_core_news_lg
+python -m spacy download pt_core_news_lg
 ```
 
-### 4. Configurar modelo GGUF
+### 4. Configurar modelo GGUF (opcional)
 
 Coloque seu modelo GGUF em `models/` (ex.: `models/model.gguf`).
+
+**Modelo recomendado: Qwen**
+
+Para usar o modelo Qwen, baixe uma versão GGUF do repositório oficial:
+
+- [Qwen2.5 GGUF Models](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF)
+  Para testes iniciais, usamos o modelo Qween 2.5 7b q4 k_m
+  https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/blob/main/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf
+  https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/blob/main/qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf
+
+Após o download, coloque o arquivo `.gguf` na pasta `models/` e use com a flag `--chat-format qwen`:
+
+```bash
+python main.py --pdf documento.pdf --out output\result.json --model models\qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguff --chat-format qwen
+```
 
 ## 💻 Uso
 
@@ -103,12 +118,10 @@ O pipeline gera um arquivo JSON com a seguinte estrutura:
     },
     "top_ranked": {
       "funcionario": [
-        {"text": "João Silva", "score": 0.95},
-        {"text": "J. Silva", "score": 0.70}
+        { "text": "João Silva", "score": 0.95 },
+        { "text": "J. Silva", "score": 0.7 }
       ],
-      "empresa": [
-        {"text": "Empresa XYZ Ltda", "score": 0.98}
-      ]
+      "empresa": [{ "text": "Empresa XYZ Ltda", "score": 0.98 }]
     },
     "llm_used": true
   }
@@ -136,9 +149,10 @@ Em caso de falha na extração ou erro de processamento, a saída será:
 
 ## 🔒 Privacidade e Segurança
 
-- **Processamento 100% local**: O pipeline não envia seu PDF nem resultados para nenhum servidor
-- **Modo offline**: Use a flag `--offline` para garantir que nenhum download ocorra durante a execução
-- **Arquivos ignorados**: Por padrão, o `.gitignore` exclui `*.pdf`, `output/`, `result/` e `models/`
+- **Processamento local**: O pipeline não envia seu PDF nem resultados para nenhum servidor. Todo o processamento acontece na sua máquina
+- **Downloads automáticos**: Por padrão, o projeto faz downloads automáticos de modelos e dependências quando necessário (Docling, spaCy, etc.)
+- **Modo offline**: Use a flag `--offline` para desabilitar downloads durante a execução (requer que todos os modelos já estejam instalados)
+- **Arquivos ignorados**: Por padrão, o `.gitignore` exclui `*.pdf`, `output/`, `result/`, `.history/` e `models/`
 
 ## ⚙️ Configuração
 
